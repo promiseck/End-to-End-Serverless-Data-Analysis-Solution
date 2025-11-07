@@ -1,0 +1,107 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: End-to-End Serverless Data Analytics Infrastructure for Data Science Salary Insights
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: ds-salaries
+    Description: Project prefix for resource naming
+
+Resources:
+  ### S3 Buckets ###
+  RawDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${ProjectName}-raw-${AWS::AccountId}
+      VersioningConfiguration:
+        Status: Enabled
+
+  ProcessedDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${ProjectName}-processed-${AWS::AccountId}
+
+  AthenaResultsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${ProjectName}-athena-results-${AWS::AccountId}
+
+  ### Glue Database ###
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: ds_salaries_db
+
+  ### IAM Role for Glue ###
+  GlueServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-glue-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: GlueS3AccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${ProjectName}-raw-${AWS::AccountId}
+                  - !Sub arn:aws:s3:::${ProjectName}-raw-${AWS::AccountId}/*
+                  - !Sub arn:aws:s3:::${ProjectName}-processed-${AWS::AccountId}
+                  - !Sub arn:aws:s3:::${ProjectName}-processed-${AWS::AccountId}/*
+                  - !Sub arn:aws:s3:::${ProjectName}-athena-results-${AWS::AccountId}
+                  - !Sub arn:aws:s3:::${ProjectName}-athena-results-${AWS::AccountId}/*
+
+  ### Glue Crawler ###
+  GlueCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub ${ProjectName}-crawler
+      Role: !GetAtt GlueServiceRole.Arn
+      DatabaseName: !Ref GlueDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub s3://${ProjectName}-raw-${AWS::AccountId}/
+      TablePrefix: salaries_
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: LOG
+
+Outputs:
+  RawDataBucket:
+    Value: !Ref RawDataBucket
+    Description: S3 bucket for raw data files
+
+  ProcessedDataBucket:
+    Value: !Ref ProcessedDataBucket
+    Description: S3 bucket for processed data
+
+  AthenaResultsBucket:
+    Value: !Ref AthenaResultsBucket
+    Description: Athena query results location
+
+  GlueDatabaseName:
+    Value: !Ref GlueDatabase
+    Description: Name of Glue Database
+
+  GlueCrawlerName:
+    Value: !Ref GlueCrawler
+    Description: Glue crawler name
+
+  GlueServiceRole:
+    Value: !Ref GlueServiceRole
+    Description: IAM role for Glue crawler and ETL jobs
