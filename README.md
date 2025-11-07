@@ -15,6 +15,8 @@ The challenge is to build a scalable, cost-efficient, and fully managed data ana
 This project solves that challenge by using AWS serverless services to build a complete analytics pipeline that automatically handles data storage, processing, querying, and visualization.
 
  **Architecture Workflow**
+ <img width="1536" height="1024" alt="ChatGPT Image Nov 7, 2025, 04_46_39 PM" src="https://github.com/user-attachments/assets/c2ed912b-3e1b-4cfe-b12d-010ddab23f60" />
+
 
 Data Ingestion – Raw CSV dataset containing salary information is uploaded to an Amazon S3 bucket (serving as a data lake).
 
